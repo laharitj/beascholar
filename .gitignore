@@ -1,0 +1,7 @@
+node_modules/
+supabase/.temp/
+be-a-scholar/supabase/.temp/
+.env
+.env.*
+!.env.example
+*.log

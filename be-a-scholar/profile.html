@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Manage your Be A Scholar student profile." />
+  <title>Student profile | Be A Scholar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/profile.css" />
+  <link rel="stylesheet" href="css/profile-fields.css" />
+</head>
+<body class="profile-page">
+  <header class="profile-header"><div class="container profile-nav"><a class="brand" href="index.html"><span class="brand-mark">B</span><span>Be A Scholar</span></a><div class="profile-nav-actions"><span class="profile-email" data-profile-email></span><button class="button button-ghost button-small" type="button" data-logout>Log out</button></div></div></header>
+  <main class="profile-main container">
+    <section class="profile-intro"><div><p class="eyebrow">Student profile</p><h1>Make your<br /><em>story visible.</em></h1><p>Keep your details current so your future applications start from a stronger place.</p></div><div class="profile-badge" aria-hidden="true"><span>BS</span><small>YOUR<br />PROFILE</small></div></section>
+    <section class="profile-shell"><div class="profile-shell-heading"><div><p class="eyebrow">Personal details</p><h2>Your foundation</h2></div><span class="save-state" data-save-state>Changes are saved to your account</span></div><form id="profile-form" novalidate><div class="profile-form-grid"><div class="form-field"><label for="profile-full-name">Name *</label><input id="profile-full-name" name="full_name" type="text" autocomplete="name" placeholder="Your full name" required /><small class="field-error" data-error-for="profile-full-name"></small></div></div><p class="form-message" data-profile-message role="status"></p><button class="button button-primary" type="submit" data-save-profile>Save profile <span aria-hidden="true">↗</span></button></form></section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/auth.js"></script><script src="js/profile.js"></script>
+</body>
+</html>

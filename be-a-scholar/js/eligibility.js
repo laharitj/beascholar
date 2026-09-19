@@ -57,12 +57,10 @@ function resultCard(result) {
   </article>`;
 }
 function visibleResults() {
-  const search = String(document.querySelector('[data-search]')?.value || '').toLowerCase().trim();
   const state = document.querySelector('[data-state-filter]')?.value || '';
   return allResults.filter((result) => {
     const scholarship = result.scholarship;
-    const searchable = `${scholarship.name} ${scholarship.state} ${scholarship.provider} ${scholarship.eligibility}`.toLowerCase();
-    return (activeStatus === 'ALL' || result.status === activeStatus) && (!state || String(scholarship.state || '').trim().toLowerCase() === state.trim().toLowerCase()) && (!search || searchable.includes(search));
+    return (activeStatus === 'ALL' || result.status === activeStatus) && (!state || String(scholarship.state || '').trim().toLowerCase() === state.trim().toLowerCase());
   });
 }
 function renderResults() {
@@ -138,7 +136,6 @@ async function loadEligibility() {
 }
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-status-filter]').forEach((button) => button.addEventListener('click', () => { activeStatus = button.dataset.statusFilter; document.querySelectorAll('[data-status-filter]').forEach((item) => item.classList.toggle('is-active', item === button)); renderResults(); }));
-  document.querySelector('[data-search]')?.addEventListener('input', renderResults);
   document.querySelector('[data-state-filter]')?.addEventListener('change', renderResults);
   document.querySelector('[data-logout]')?.addEventListener('click', async () => { await logout(); window.location.href = 'login.html'; });
   loadEligibility();

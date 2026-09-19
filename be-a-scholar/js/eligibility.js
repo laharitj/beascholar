@@ -1,7 +1,5 @@
 let allResults = [];
 let activeStatus = 'ALL';
-let latestStudentProfile = null;
-let aiBusy = false;
 
 function escapeHtml(value) {
   return String(value || '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
@@ -28,7 +26,6 @@ const statusTitles = {
 function resultCard(result) {
   const { scholarship } = result;
   const portal = normalizeUrl(scholarship.officialPortal);
-  const aiLabel = result.status === 'ELIGIBLE' ? 'Explain my eligibility' : result.status === 'NOT_ELIGIBLE' ? 'Why am I not eligible?' : 'What needs verification?';
   return `<article class="scholarship-card" data-result-id="${escapeHtml(scholarship.id)}">
     <button class="scholarship-name-toggle" type="button" data-card-toggle="${escapeHtml(scholarship.id)}">
       <span class="scholarship-name">${escapeHtml(scholarship.name || 'Unnamed scholarship')}</span>
@@ -52,10 +49,8 @@ function resultCard(result) {
         <p><strong>Eligibility:</strong> ${escapeHtml(scholarship.eligibility || 'Not listed')}</p>
         <p><strong>Benefits:</strong> ${escapeHtml(scholarship.benefits || 'Not listed')}</p>
       </div>
-      <div class="ai-card-response" data-ai-response></div>
       <div class="card-actions">
         ${portal ? `<a class="button button-primary button-small" href="${escapeHtml(portal)}" target="_blank" rel="noopener noreferrer">Apply officially ↗</a>` : '<span class="card-muted">No official portal listed</span>'}
-        <button class="button button-ghost button-small" type="button" data-ai-explain="${escapeHtml(scholarship.id)}">${aiLabel}</button>
         <span class="source-label">Source: Google Sheet</span>
       </div>
     </div>
@@ -111,63 +106,7 @@ function renderResults() {
     });
   });
 
-  grid.querySelectorAll('[data-ai-explain]').forEach((button) => {
-    button.addEventListener('click', () => explainResult(button.dataset.aiExplain, button));
-  });
-
   setResultsMessage(results.length ? `${results.length} scholarship result${results.length === 1 ? '' : 's'} shown.` : 'No scholarships could be matched with the information currently available.', results.length ? 'is-ready' : 'is-empty');
-}
-function aiContext(result) {
-  return { studentEligibilityData: latestStudentProfile, scholarship: { name: result.scholarship.name, state: result.scholarship.state, eligibilityCriteria: result.scholarship.eligibility, benefits: result.scholarship.benefits, officialApplicationUrl: result.scholarship.officialPortal }, eligibilityResult: { status: result.status, matchedCriteria: result.matchedCriteria, failedCriteria: result.failedCriteria, missingInformation: result.missingInformation } };
-}
-function aiAssistantPayload(question) {
-  const scholarshipResults = allResults.map((result) => ({
-    status: result.status,
-    scholarship: result.scholarship,
-    matchedCriteria: result.matchedCriteria,
-    failedCriteria: result.failedCriteria,
-    missingInformation: result.missingInformation
-  }));
-  return {
-    studentProfile: latestStudentProfile,
-    scholarships: scholarshipResults,
-    eligibleScholarships: scholarshipResults.filter((result) => result.status === 'ELIGIBLE'),
-    potentialScholarships: scholarshipResults.filter((result) => result.status === 'NEEDS_VERIFICATION'),
-    notMatchedScholarships: scholarshipResults.filter((result) => result.status === 'NOT_ELIGIBLE'),
-    userQuestion: question
-  };
-}
-async function explainResult(id, button) {
-  if (aiBusy) return;
-  const result = allResults.find((item) => item.scholarship.id === id);
-  const card = button.closest('.scholarship-card');
-  const response = card?.querySelector('[data-ai-response]');
-  if (!result || !response) return;
-  const originalLabel = button.textContent;
-  aiBusy = true; button.disabled = true; button.textContent = 'Preparing your explanation...'; response.textContent = '';
-  try { response.textContent = await window.aiService.callScholarshipAI({ mode: 'explanation', ...aiContext(result) }); }
-  catch (error) { console.error('Scholarship AI explanation failed:', error); response.textContent = aiErrorMessage(error, 'Your eligibility result is still available below.'); }
-  finally { aiBusy = false; button.disabled = false; button.textContent = originalLabel; }
-}
-function aiErrorMessage(error, suffix) {
-  const status = Number(error?.status) || 0;
-  const backendMessage = String(error?.backendMessage || error?.message || 'Unknown AI error.');
-  const messages = {
-    401: 'User session expired. Please log in again.',
-    400: 'Invalid AI request. Check the request payload.',
-    429: 'Gemini quota exceeded. Please try again later.',
-    502: 'Gemini API failed to generate a response.',
-    503: 'Gemini configuration missing. Check Supabase Edge Function secrets.'
-  };
-  const friendly = messages[status] || 'AI request failed.';
-  return `${friendly} (HTTP ${status || 'unknown'}: ${backendMessage}) ${suffix}`;
-}
-async function askAssistant(question, responseElement, button) {
-  if (aiBusy) return;
-  aiBusy = true; button.disabled = true; responseElement.textContent = 'Preparing your explanation...';
-  try { responseElement.textContent = await window.aiService.callScholarshipAI(aiAssistantPayload(question)); }
-  catch (error) { console.error('Scholarship AI assistant failed:', error); responseElement.textContent = aiErrorMessage(error, 'Your eligibility results are still available below.'); }
-  finally { aiBusy = false; button.disabled = false; }
 }
 function updateCounts() {
   document.querySelector('[data-results-count]').textContent = allResults.length;
@@ -184,16 +123,14 @@ async function loadEligibility() {
   if (userError || !user) { window.location.href = 'login.html'; return; }
   const { data: profile, error: profileError } = await client.from('users').select('date_of_birth, gender, state, category, annual_family_income, education_level, course, academic_performance, scholar_type, disability, minority, residence_type').eq('id', user.id).single();
   if (profileError) { setResultsMessage('Your saved profile could not be loaded. Please return to your profile and try again.', 'is-error'); return; }
-  latestStudentProfile = profile;
   try {
     const scholarships = await window.scholarshipService.fetchScholarships();
-    const selectedState = String(profile.state || '').trim();
-    const stateScholarships = scholarships.filter((scholarship) => String(scholarship.state || '').trim().toLowerCase() === selectedState.toLowerCase());
-    allResults = stateScholarships.map((scholarship) => window.eligibilityEngine.evaluateScholarship(profile, scholarship));
+    allResults = scholarships.map((scholarship) => window.eligibilityEngine.evaluateScholarship(profile, scholarship));
     const stateFilter = document.querySelector('[data-state-filter]');
-    if (stateFilter && selectedState) {
-      stateFilter.innerHTML = `<option value="${escapeHtml(selectedState)}">${escapeHtml(selectedState)}</option>`;
-      stateFilter.value = selectedState;
+    if (stateFilter) {
+      const knownStates = [...new Set(scholarships.map((scholarship) => String(scholarship.state || '').trim()).filter(Boolean))];
+      stateFilter.innerHTML = '<option value="">All states</option>' + knownStates.map((state) => `<option value="${escapeHtml(state)}">${escapeHtml(state)}</option>`).join('');
+      stateFilter.value = '';
     }
     updateCounts();
     renderResults();
@@ -203,7 +140,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-status-filter]').forEach((button) => button.addEventListener('click', () => { activeStatus = button.dataset.statusFilter; document.querySelectorAll('[data-status-filter]').forEach((item) => item.classList.toggle('is-active', item === button)); renderResults(); }));
   document.querySelector('[data-search]')?.addEventListener('input', renderResults);
   document.querySelector('[data-state-filter]')?.addEventListener('change', renderResults);
-  document.querySelector('[data-assistant-form]')?.addEventListener('submit', (event) => { event.preventDefault(); const form = event.currentTarget; askAssistant(form.querySelector('[data-assistant-question]').value.trim(), document.querySelector('[data-assistant-response]'), form.querySelector('button')); });
   document.querySelector('[data-logout]')?.addEventListener('click', async () => { await logout(); window.location.href = 'login.html'; });
   loadEligibility();
 });

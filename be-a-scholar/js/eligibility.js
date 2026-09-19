@@ -57,11 +57,7 @@ function resultCard(result) {
   </article>`;
 }
 function visibleResults() {
-  const state = document.querySelector('[data-state-filter]')?.value || '';
-  return allResults.filter((result) => {
-    const scholarship = result.scholarship;
-    return (activeStatus === 'ALL' || result.status === activeStatus) && (!state || String(scholarship.state || '').trim().toLowerCase() === state.trim().toLowerCase());
-  });
+  return allResults.filter((result) => activeStatus === 'ALL' || result.status === activeStatus);
 }
 function renderResults() {
   const results = visibleResults();
@@ -124,19 +120,12 @@ async function loadEligibility() {
   try {
     const scholarships = await window.scholarshipService.fetchScholarships();
     allResults = scholarships.map((scholarship) => window.eligibilityEngine.evaluateScholarship(profile, scholarship));
-    const stateFilter = document.querySelector('[data-state-filter]');
-    if (stateFilter) {
-      const knownStates = [...new Set(scholarships.map((scholarship) => String(scholarship.state || '').trim()).filter(Boolean))];
-      stateFilter.innerHTML = '<option value="">All states</option>' + knownStates.map((state) => `<option value="${escapeHtml(state)}">${escapeHtml(state)}</option>`).join('');
-      stateFilter.value = '';
-    }
     updateCounts();
     renderResults();
   } catch (error) { setResultsMessage('Scholarship information is temporarily unavailable. Please try again later.', 'is-error'); }
 }
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-status-filter]').forEach((button) => button.addEventListener('click', () => { activeStatus = button.dataset.statusFilter; document.querySelectorAll('[data-status-filter]').forEach((item) => item.classList.toggle('is-active', item === button)); renderResults(); }));
-  document.querySelector('[data-state-filter]')?.addEventListener('change', renderResults);
   document.querySelector('[data-logout]')?.addEventListener('click', async () => { await logout(); window.location.href = 'login.html'; });
   loadEligibility();
 });
